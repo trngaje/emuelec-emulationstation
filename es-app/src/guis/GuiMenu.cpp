@@ -406,6 +406,7 @@ void GuiMenu::openEmuELECSettings()
 		std::vector<std::string> devices;
 		devices.push_back("Emulationstation");
 		devices.push_back("Retroarch");
+		devices.push_back("AttractMode");
 		for (auto it = devices.cbegin(); it != devices.cend(); it++)
 		emuelec_boot_def->add(*it, *it, SystemConf::getInstance()->get("ee_boot") == *it);
 		s->addWithLabel(_("START AT BOOT"), emuelec_boot_def);
