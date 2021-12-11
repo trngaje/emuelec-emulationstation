@@ -79,13 +79,9 @@ void MetaDataList::initMetadata()
 
 		{ GameTime,         "gametime",    MD_INT,                 "0",                true,       _("Game time"),            _("how long the game has been played in total (seconds)"), false },
 
-		{ Language,         "lang",        MD_STRING,              "",                 false,      _("Languages"),            _("Languages"),				false },
-		{ Region,           "region",      MD_STRING,              "",                 false,      _("Region"),               _("Region"),					false },
-
-		{ CheevosHash,      "cheevosHash", MD_STRING,              "",                 true,       _("Cheevos Hash"),          _("Cheevos checksum"),	    false },
-		{ CheevosId,        "cheevosId",   MD_INT,                 "",				   true,       _("Cheevos Game ID"),       _("Cheevos Game ID"),		false },
-
-		{ ScraperId,        "id",		   MD_INT,                 "",				   true,       _("Screenscraper Game ID"), _("Screenscraper Game ID"),	false, true }
+		{ Language,         "lang",        MD_STRING,              "",                 false,       _("Languages"),            _("Languages"),				false },
+		{ Region,           "region",      MD_STRING,              "",                 false,       _("Region"),               _("Region"),					false },
+		{ Cheevos,          "cheevos",     MD_BOOL,                "false",            false,       _("Has Achievements"),     _("Has Achievements"),		false }
 	};
 	
 	mMetaDataDecls = std::vector<MetaDataDecl>(gameDecls, gameDecls + sizeof(gameDecls) / sizeof(gameDecls[0]));

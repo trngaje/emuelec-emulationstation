@@ -14,19 +14,17 @@ enum FilterIndexType
 {
 	NONE = 0,
 	GENRE_FILTER = 1,
-	FAMILY_FILTER = 2,
-	PLAYER_FILTER = 3,
-	PUBDEV_FILTER = 4,
-	RATINGS_FILTER = 5,
-	YEAR_FILTER = 6,
-	KIDGAME_FILTER = 7,
-	HIDDEN_FILTER = 8,
-	PLAYED_FILTER = 9,
-	LANG_FILTER = 10,
-	REGION_FILTER = 11,
-	FAVORITES_FILTER = 12,
-	CHEEVOS_FILTER = 13,
-	VERTICAL_FILTER = 14
+	PLAYER_FILTER = 2,
+	PUBDEV_FILTER = 3,
+	RATINGS_FILTER = 4,
+	YEAR_FILTER = 5,
+	KIDGAME_FILTER = 6,
+	HIDDEN_FILTER = 7,
+	PLAYED_FILTER = 8,
+	LANG_FILTER = 9,
+	REGION_FILTER = 10,
+	FAVORITES_FILTER = 11,
+	CHEEVOS_FILTER = 12
 };
 
 struct FilterDataDecl
@@ -61,8 +59,9 @@ public:
 	void clearAllFilters();
 	
 	virtual int showFile(FileData* game);
-	virtual bool isFiltered() { return (!mTextFilter.empty() || filterByGenre || filterByPlayers || filterByPubDev || filterByFamily
-		|| filterByRatings || filterByFavorites || filterByKidGame || filterByPlayed || filterByLang || filterByRegion || filterByYear || filterByCheevos || filterByVertical); };
+
+	virtual bool isFiltered() { return (!mTextFilter.empty() || filterByGenre || filterByPlayers || filterByPubDev 
+		|| filterByRatings || filterByFavorites || filterByKidGame || filterByPlayed || filterByLang || filterByRegion || filterByYear || filterByCheevos); };
 
 	bool isKeyBeingFilteredBy(std::string key, FilterIndexType type);
 	std::vector<FilterDataDecl> getFilterDataDecls();
@@ -108,7 +107,6 @@ protected:
 	bool filterByLang;
 	bool filterByRegion;
 	bool filterByCheevos;
-	bool filterByVertical;
 
 	std::map<std::string, int> genreIndexAllKeys;
 	std::map<std::string, int> familyIndexAllKeys;
@@ -123,8 +121,6 @@ protected:
 	std::map<std::string, int> regionIndexAllKeys;
 	std::map<std::string, int> cheevosIndexAllKeys;
 
-	std::map<std::string, int> verticalIndexAllKeys;
-
 	std::unordered_set<std::string> genreIndexFilteredKeys;
 	std::unordered_set<std::string> familyIndexFilteredKeys;
 	std::unordered_set<std::string> playersIndexFilteredKeys;
@@ -137,7 +133,6 @@ protected:
 	std::unordered_set<std::string> langIndexFilteredKeys;
 	std::unordered_set<std::string> regionIndexFilteredKeys;
 	std::unordered_set<std::string> cheevosIndexFilteredKeys;
-	std::unordered_set<std::string> verticalIndexFilteredKeys;
 
 	std::string mTextFilter;
 	bool		mUseRelevency;

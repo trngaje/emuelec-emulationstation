@@ -65,13 +65,7 @@ enum MetaDataId
 	BoxArt = 31,
 	Wheel = 32,
 	Mix = 33,
-	CheevosHash = 34,
-	CheevosId = 35,
-	ScraperId = 36,
-	BoxBack = 37,
-	Magazine = 38,
-	GenreIds = 39,
-	Family = 40
+	Cheevos = 34
 };
 
 namespace MetaDataImportType
