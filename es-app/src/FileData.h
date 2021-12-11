@@ -63,6 +63,10 @@ public:
 	virtual ~FileData();
 
 	virtual const std::string& getName();
+#ifdef _ENABLEEMUELEC
+  virtual const std::string& getSortName();
+	virtual const std::string getSortOrName();
+#endif
 
 	inline FileType getType() const { return mType; }
 	
@@ -94,6 +98,8 @@ public:
 	virtual const bool getKidGame();
 	virtual const bool hasCheevos();
 
+	std::vector<std::string> getFileMedias();
+
 	const std::string getConfigurationName();
 
 	inline bool isPlaceHolder() { return mType == PLACEHOLDER; };	
@@ -113,7 +119,10 @@ public:
 	// As above, but also remove parenthesis
 	std::string getCleanName();
 
-	bool launchGame(Window* window, LaunchGameOptions options = LaunchGameOptions());
+	std::string getlaunchCommand(bool includeControllers = true) { LaunchGameOptions options; return getlaunchCommand(options, includeControllers); };
+	std::string getlaunchCommand(LaunchGameOptions& options, bool includeControllers = true);
+
+	bool		launchGame(Window* window, LaunchGameOptions options = LaunchGameOptions());
 
 	static void resetSettings();
 	
@@ -147,6 +156,8 @@ public:
 	bool hasContentFiles();
 	std::set<std::string> getContentFiles();
 
+	void speak();
+
 private:
 	std::string getKeyboardMappingFilePath();
 	MetaDataList mMetadata;
@@ -157,6 +168,9 @@ protected:
 	FileType mType;
 	SystemData* mSystem;
 	std::string* mDisplayName;
+#ifdef _ENABLEEMUELEC
+	std::string* mSortName;
+#endif
 };
 
 class CollectionFileData : public FileData
@@ -164,7 +178,7 @@ class CollectionFileData : public FileData
 public:
 	CollectionFileData(FileData* file, SystemData* system);
 	~CollectionFileData();
-	const std::string& getName();	
+	const std::string& getName();
 	FileData* getSourceFileData();
 	std::string getKey();
 	virtual const std::string getPath() const;

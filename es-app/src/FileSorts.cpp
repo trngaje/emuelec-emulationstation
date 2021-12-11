@@ -1,7 +1,12 @@
+#include <Settings.h>
 #include "FileSorts.h"
 
 #include "utils/StringUtil.h"
 #include "LocaleES.h"
+
+#ifdef _ENABLEEMUELEC
+	#include <climits>
+#endif
 
 namespace FileSorts
 {
@@ -68,16 +73,129 @@ namespace FileSorts
 		mSortTypes.push_back(SortType(SYSTEM_RELEASEDATE_DESCENDING, &compareSystemReleaseYear, false, _("SYSTEM, RELEASE YEAR, DESCENDING"), _U("\uF161 ")));
 		mSortTypes.push_back(SortType(RELEASEDATE_SYSTEM_ASCENDING, &compareReleaseYearSystem, true, _("RELEASE YEAR, SYSTEM, ASCENDING"), _U("\uF160 ")));
 		mSortTypes.push_back(SortType(RELEASEDATE_SYSTEM_DESCENDING, &compareReleaseYearSystem, false, _("RELEASE YEAR, SYSTEM, DESCENDING"), _U("\uF161 ")));
+#ifdef _ENABLEEMUELEC
+		mSortTypes.push_back(SortType(SORTNAME_ASCENDING, &compareSortName, true, _("SORTNAME, ASCENDING"), _U("\uF15d ")));
+		mSortTypes.push_back(SortType(SORTNAME_DESCENDING, &compareSortName, false, _("SORTNAME, DESCENDING"), _U("\uF15e ")));
+#endif
+	}
+
+#ifdef _ENABLEEMUELEC
+	int _digitPrefixLength(const std::string s)
+	{
+		int l = s.size();
+		int i = 0;
+		while(i < l) {
+			 if(!std::isdigit(s[i])) {
+					if (s[i] != ' ')
+						return 0;
+					else
+						return i;
+			 }
+			 ++i;
+		}
+		return 0;
+	}
+
+	bool _comparePrefixDigits(std::string name1, std::string name2)
+	{
+		int p1 = _digitPrefixLength(name1);
+		int p2 = _digitPrefixLength(name2);
+		if (p1 != p2)
+			return p1 > p2;
+
+		int i1 = std::atoi(name1.c_str());
+		int i2 = std::atoi(name2.c_str());
+		if (i1 == 0) i1 = INT_MAX;
+		if (i2 == 0) i2 = INT_MAX;
+		//if (i1 != i2)
+		return i1 < i2;
+	}
+
+	bool _compareNames(std::string name1, std::string name2)
+	{
+		const bool ignoreArticles = Settings::getInstance()->getBool("IgnoreLeadingArticles");
+		if (ignoreArticles)
+		{
+			const auto articles = Utils::String::commaStringToVector(_("A,AN,THE"));
+			name1 = stripLeadingArticle(name1, articles);
+			name2 = stripLeadingArticle(name2, articles);
+		}
+		return Utils::String::compareIgnoreCase(name1, name2) < 0;
 	}
 
 	//returns if file1 should come before file2
 	bool compareName(const FileData* file1, const FileData* file2)
 	{
 		if (file1->getType() != file2->getType())
+		{
+			return file1->getType() == FOLDER;
+		}
+
+		// we compare the actual metadata name, as collection files have the system appended which messes up the order
+		const std::string name1 = ((FileData *) file1)->getName();
+		const std::string name2 = ((FileData *) file2)->getName();
+
+		if (_digitPrefixLength(name1) || _digitPrefixLength(name2))
+			return _comparePrefixDigits(name1, name2);
+		
+		return _compareNames(name1, name2);
+	}
+
+	bool compareSortName(const FileData* file1, const FileData* file2)
+	{
+		if (file1->getType() != file2->getType())
+		{
+			return file1->getType() == FOLDER;
+		}
+
+    std::string name1 = (std::string) ((FileData *) file1)->getSortOrName();
+    std::string name2 = (std::string) ((FileData *) file2)->getSortOrName();
+
+		if (_digitPrefixLength(name1) || _digitPrefixLength(name2))
+			return _comparePrefixDigits(name1, name2);
+
+		return _compareNames(name1, name2);
+	}
+
+#else
+	bool compareName(const FileData* file1, const FileData* file2)
+	{
+		if (file1->getType() != file2->getType())
+		{
 			return file1->getType() == FOLDER;
 
-		// we compare the actual metadata name, as collection files have the system appended which messes up the order		
-		return Utils::String::compareIgnoreCase(((FileData*)file1)->getName(), ((FileData*)file2)->getName()) < 0;
+		}
+		// we compare the actual metadata name, as collection files have the system appended which messes up the order
+		auto name1 = ((FileData *) file1)->getName();
+		auto name2 = ((FileData *) file2)->getName();
+		const bool ignoreArticles = Settings::getInstance()->getBool("IgnoreLeadingArticles");
+		if (ignoreArticles)
+		{
+			const auto articles = Utils::String::commaStringToVector(_("A,AN,THE"));
+			name1 = stripLeadingArticle(name1, articles);
+			name2 = stripLeadingArticle(name2, articles);
+		}
+		return Utils::String::compareIgnoreCase(name1, name2) < 0;
+	}
+#endif
+
+	std::string stripLeadingArticle(const std::string &string, const std::vector<std::string> &articles)
+	{
+		const auto candidate = Utils::String::trim(string);
+		const auto index = candidate.find_first_of(" \t\r\n");
+		if (index == std::string::npos)
+		{
+			return string;
+		}
+		const auto maybeArticle = candidate.substr(0, index);
+		for (auto &article: articles)
+		{
+			if (Utils::String::compareIgnoreCase(article, maybeArticle) == 0)
+			{
+				return Utils::String::trim(candidate.substr(article.length()));
+			}
+		}
+		return string;
 	}
 
 	bool compareRating(const FileData* file1, const FileData* file2)

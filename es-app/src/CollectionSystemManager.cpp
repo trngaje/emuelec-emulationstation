@@ -827,8 +827,8 @@ void CollectionSystemManager::updateCollectionFolderMetadata(SystemData* sys)
 		games_counter = games.size();
 
 		snprintf(trstring, 1024, ngettext(
-			"This collection contains %i game, including :%s",
-			"This collection contains %i games, including :%s", games_counter), games_counter, games_list.c_str());
+			"This collection contains %i game:%s",
+			"This collection contains %i games, including:%s", games_counter), games_counter, games_list.c_str());
 
 		desc = trstring;
 
@@ -942,7 +942,7 @@ void CollectionSystemManager::populateAutoCollection(CollectionSystemData* sysDa
 	CollectionSystemDecl sysDecl = sysData->decl;
 	FolderData* rootFolder = newSys->getRootFolder();
 
-	bool hiddenSystemsShowGames = Settings::getInstance()->getBool("HiddenSystemsShowGames");
+	bool hiddenSystemsShowGames = Settings::HiddenSystemsShowGames();
 	auto hiddenSystems = Utils::String::split(Settings::getInstance()->getString("HiddenSystems"), ';');
 
 	for (auto& system : SystemData::sSystemVector)
@@ -1074,7 +1074,8 @@ void CollectionSystemManager::populateCustomCollection(CollectionSystemData* sys
 	CollectionSystemDecl sysDecl = sysData->decl;
 
 	auto hiddenSystems = Utils::String::split(Settings::getInstance()->getString("HiddenSystems"), ';');
-
+	auto hiddenSystemsShowGames = Settings::HiddenSystemsShowGames();
+	
 	if (sysData->filteredIndex != nullptr)
 	{
 		sysData->filteredIndex->resetIndex();
@@ -1096,7 +1097,7 @@ void CollectionSystemManager::populateCustomCollection(CollectionSystemData* sys
 
 				if (sysData->filteredIndex->showFile(game))
 				{
-					if (std::find(hiddenSystems.cbegin(), hiddenSystems.cend(), game->getSystemName()) != hiddenSystems.cend())
+					if (!hiddenSystemsShowGames && std::find(hiddenSystems.cbegin(), hiddenSystems.cend(), game->getSystemName()) != hiddenSystems.cend())
 						continue;
 
 					CollectionFileData* newGame = new CollectionFileData(game, newSys);

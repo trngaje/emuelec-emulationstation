@@ -431,6 +431,14 @@ std::string getArchString()
 	return "odroidgoa";
 #endif
 
+#if GAMEFORCE
+	return "gameforce";
+#endif
+
+#if RK3326
+	return "rk3326";
+#endif
+
 #if ODROIDXU4
 	return "odroidxu4";
 #endif
@@ -447,6 +455,10 @@ std::string getArchString()
 	return "tinkerboard";
 #endif
 
+#if RK3288
+	return "rk3288";
+#endif
+
 #if RK3399
 	return "rk3399";
 #endif
@@ -455,8 +467,8 @@ std::string getArchString()
 	return "miqi";
 #endif
 
-#if LIBRETECH_H5
-	return "libretech_h5";
+#if TRITIUM_H5
+	return "tritium_h5";
 #endif
 
 #if ORANGEPI_ZERO2
@@ -465,6 +477,10 @@ std::string getArchString()
 
 #if ORANGEPI_PC
 	return "orangepi_pc";
+#endif
+
+#if CHA
+	return "cha";
 #endif
 
 #if S812

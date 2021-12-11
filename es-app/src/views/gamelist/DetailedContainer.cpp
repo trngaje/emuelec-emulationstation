@@ -220,7 +220,7 @@ std::vector<MdComponent> DetailedContainer::getMetaComponents()
 }
 
 
-void DetailedContainer::createImageComponent(ImageComponent** pImage, bool forceLoad)
+void DetailedContainer::createImageComponent(ImageComponent** pImage, bool forceLoad, bool allowFading)
 {
 	if (*pImage != nullptr)
 		return;
@@ -229,8 +229,8 @@ void DetailedContainer::createImageComponent(ImageComponent** pImage, bool force
 	auto mSize = mParent->getSize();
 
 	// Image	
-	auto image = new ImageComponent(mWindow, forceLoad || mViewType == DetailedContainerType::VideoView);
-	image->setAllowFading(false);
+	auto image = new ImageComponent(mWindow, !Settings::AllImagesAsync() && (forceLoad || mViewType == DetailedContainerType::VideoView));
+	image->setAllowFading(allowFading);
 	image->setOrigin(0.5f, 0.5f);
 	image->setPosition(mSize.x() * 0.25f, mList->getPosition().y() + mSize.y() * 0.2125f);
 	image->setMaxSize(mSize.x() * (0.50f - 2 * padding), mSize.y() * 0.4f);
@@ -348,7 +348,7 @@ void DetailedContainer::loadIfThemed(ImageComponent** pImage, const std::shared_
 	auto elem = theme->getElement(getName(), element, "image");
 	if (forceLoad || (elem && elem->properties.size() > 0))
 	{
-		createImageComponent(pImage, element == "md_fanart");
+		createImageComponent(pImage, element == "md_fanart", element == "md_fanart" && Settings::AllImagesAsync());
 		(*pImage)->applyTheme(theme, getName(), element, loadPath ? ALL : ALL ^ (PATH));
 	}
 	else if ((*pImage) != nullptr)
@@ -558,12 +558,24 @@ void DetailedContainer::updateDetailsForFolder(FolderData* folder)
 				std::string snapShot = imagePath;
 
 				auto src = mVideo->getSnapshotSource();
-				if (src == MARQUEE && !firstGameWithImage->getMarqueePath().empty())
+
+
+				if (src == TITLESHOT && Utils::FileSystem::exists(firstGameWithImage->getMetadata(MetaDataId::TitleShot)))
+					snapShot = firstGameWithImage->getMetadata(MetaDataId::TitleShot);
+				else if (src == BOXART && Utils::FileSystem::exists(firstGameWithImage->getMetadata(MetaDataId::BoxArt)))
+					snapShot = firstGameWithImage->getMetadata(MetaDataId::BoxArt);
+				else if (src == MARQUEE && !firstGameWithImage->getMarqueePath().empty())
 					snapShot = firstGameWithImage->getMarqueePath();
-				if (src == THUMBNAIL && !firstGameWithImage->getThumbnailPath().empty())
+				else if ((src == THUMBNAIL || src == BOXART) && !firstGameWithImage->getThumbnailPath().empty())
 					snapShot = firstGameWithImage->getThumbnailPath();
-				if (src == IMAGE && !firstGameWithImage->getImagePath().empty())
+				else if ((src == IMAGE || src == TITLESHOT) && !firstGameWithImage->getImagePath().empty())
 					snapShot = firstGameWithImage->getImagePath();
+				else if (src == FANART && Utils::FileSystem::exists(firstGameWithImage->getMetadata(MetaDataId::FanArt)))
+					snapShot = firstGameWithImage->getMetadata(MetaDataId::FanArt);
+				else if (src == CARTRIDGE && Utils::FileSystem::exists(firstGameWithImage->getMetadata(MetaDataId::Cartridge)))
+					snapShot = firstGameWithImage->getMetadata(MetaDataId::Cartridge);
+				else if (src == MIX && Utils::FileSystem::exists(firstGameWithImage->getMetadata(MetaDataId::Mix)))
+					snapShot = firstGameWithImage->getMetadata(MetaDataId::Mix);
 
 				mVideo->setImage(snapShot);
 			}
@@ -628,14 +640,25 @@ void DetailedContainer::updateControls(FileData* file, bool isClearing, int move
 			std::string snapShot = imagePath;
 
 			auto src = mVideo->getSnapshotSource();
-			if (src == MARQUEE && !file->getMarqueePath().empty())
-				snapShot = file->getMarqueePath();
-			if (src == THUMBNAIL && !file->getThumbnailPath().empty())
-				snapShot = file->getThumbnailPath();			
-			if (src == IMAGE && !file->getImagePath().empty())
-				snapShot = file->getImagePath();
 
-			mVideo->setImage(snapShot);
+			if (src == TITLESHOT && Utils::FileSystem::exists(file->getMetadata(MetaDataId::TitleShot)))
+				snapShot = file->getMetadata(MetaDataId::TitleShot);
+			else if (src == BOXART && Utils::FileSystem::exists(file->getMetadata(MetaDataId::BoxArt)))
+				snapShot = file->getMetadata(MetaDataId::BoxArt);
+			else if (src == MARQUEE && !file->getMarqueePath().empty())
+				snapShot = file->getMarqueePath();
+			else if ((src == THUMBNAIL || src == BOXART) && !file->getThumbnailPath().empty())
+				snapShot = file->getThumbnailPath();			
+			else if ((src == IMAGE || src == TITLESHOT) && !file->getImagePath().empty())
+				snapShot = file->getImagePath();
+			else if (src == FANART && Utils::FileSystem::exists(file->getMetadata(MetaDataId::FanArt)))
+				snapShot = file->getMetadata(MetaDataId::FanArt);
+			else if (src == CARTRIDGE && Utils::FileSystem::exists(file->getMetadata(MetaDataId::Cartridge)))
+				snapShot = file->getMetadata(MetaDataId::Cartridge);
+			else if (src == MIX && Utils::FileSystem::exists(file->getMetadata(MetaDataId::Mix)))
+				snapShot = file->getMetadata(MetaDataId::Mix);
+			
+			mVideo->setImage(snapShot, false, mVideo->getMaxSizeInfo());
 		}
 
 		if (mThumbnail != nullptr)
@@ -738,7 +761,7 @@ void DetailedContainer::updateControls(FileData* file, bool isClearing, int move
 			SystemConf::getInstance()->getBool("global.retroachievements") && (
 			file->getSourceFileData()->getSystem()->isCheevosSupported() || 
 			file->getSystem()->isCollection() || 
-			file->getSystem()->isGroupSystem()); // Fake cheevos supported if the game is in a collection cuz there are lot of games from different systems
+			!file->getSystem()->isGameSystem()); // Fake cheevos supported if the game is in a collection cuz there are lot of games from different systems
 
 		// Cheevos
 		if (mCheevos != nullptr)
@@ -1116,6 +1139,9 @@ void DetailedContainerHost::updateControls(FileData* file, bool isClearing, int 
 {
 	if (!mContainer->anyComponentHasStoryBoard() || file == nullptr || isClearing || moveBy == 0)
 	{
+		if (file != nullptr && !isClearing)
+			file->speak();
+
 		mContainer->updateControls(file, isClearing, moveBy);
 		return;
 	}
@@ -1130,6 +1156,7 @@ void DetailedContainerHost::updateControls(FileData* file, bool isClearing, int 
 	}
 
 	mActiveFile = file;
+	mActiveFile->speak();
 	bool clear = isClearing;
 	int by = moveBy;
 

@@ -126,8 +126,21 @@ const std::string GridGameListView::getImagePath(FileData* file)
 
 	if (src == ImageSource::IMAGE)
 		return file->getImagePath();
-	else if (src == ImageSource::MARQUEE || src == ImageSource::MARQUEEORTEXT)
+
+	if (src == TITLESHOT && !file->getMetadata(MetaDataId::TitleShot).empty())
+		return file->getMetadata(MetaDataId::TitleShot);
+	else if (src == BOXART && !file->getMetadata(MetaDataId::BoxArt).empty())
+		return file->getMetadata(MetaDataId::BoxArt);
+	else if ((src == MARQUEE || src == ImageSource::MARQUEEORTEXT) && !file->getMarqueePath().empty())
 		return file->getMarqueePath();
+	else if ((src == IMAGE || src == TITLESHOT) && !file->getImagePath().empty())
+		return file->getImagePath();
+	else if (src == FANART && !file->getMetadata(MetaDataId::FanArt).empty())
+		return file->getMetadata(MetaDataId::FanArt);
+	else if (src == CARTRIDGE && !file->getMetadata(MetaDataId::Cartridge).empty())
+		return file->getMetadata(MetaDataId::Cartridge);
+	else if (src == MIX && !file->getMetadata(MetaDataId::Mix).empty())
+		return file->getMetadata(MetaDataId::Mix);
 
 	return file->getThumbnailPath();
 }
@@ -139,17 +152,7 @@ const bool GridGameListView::isVirtualFolder(FileData* file)
 
 void GridGameListView::populateList(const std::vector<FileData*>& files)
 {
-	SystemData* system = mCursorStack.size() && mRoot->getSystem()->isGroupSystem() ? mCursorStack.top()->getSystem() : mRoot->getSystem();
-
-	auto groupTheme = system->getTheme();
-	if (groupTheme && mHeaderImage.hasImage())
-	{
-		const ThemeData::ThemeElement* logoElem = groupTheme->getElement(getName(), "logo", "image");
-		if (logoElem && logoElem->has("path") && Utils::FileSystem::exists(logoElem->get<std::string>("path")))
-			mHeaderImage.setImage(logoElem->get<std::string>("path"), false, mHeaderImage.getMaxSizeInfo());
-	}
-
-	mHeaderText.setText(system->getFullName());
+	updateHeaderLogoAndText();
 
 	mGrid.resetLastCursor();
 	mGrid.clear(); 

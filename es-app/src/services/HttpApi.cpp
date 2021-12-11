@@ -71,8 +71,9 @@ void HttpApi::getSystemDataJson(rapidjson::PrettyWriter<rapidjson::StringBuffer>
 	if (theme != nullptr)
 	{
 		const ThemeData::ThemeElement* elem = theme->getElement("system", "logo", "image");
-		if (elem && elem->has("path"))
+		if (elem && elem->has("path")) {
 			writer.Key("logo"); writer.String(("/systems/" + sys->getName() + "/logo").c_str());
+		}
 	}
 
 	writer.EndObject();
@@ -229,7 +230,7 @@ bool HttpApi::ImportMedia(FileData* file, const std::string& mediaType, const st
 
 		if (mdd.id == MetaDataId::Video)
 		{
-			if (extension != ".mp4" && extension != ".avi" && extension != ".mkv")
+			if (extension != ".mp4" && extension != ".avi" && extension != ".mkv" && extension != ".webm")
 				return false;
 		}
 		else if (mdd.id == MetaDataId::Manual || mdd.id == MetaDataId::Magazine)

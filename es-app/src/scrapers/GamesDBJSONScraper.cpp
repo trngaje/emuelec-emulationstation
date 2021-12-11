@@ -110,11 +110,13 @@ const std::map<PlatformId, std::string> gamesdb_new_platformid_map{
 	{ FMTOWNS, "4932" },
 	{ PHILIPS_CDI, "4917" },
 	{ WATARA_SUPERVISION, "4959" },
+	{ SONIC, "36,21" }, // Sega Mega Drive & Sega CD
 
 	// 1 = PC
 	{ PC, "1" },
 	{ MOONLIGHT, "1" },
 	{ PRBOOM, "1" },
+	{ QUAKE, "1" },
 
 	// 23 = Arcade
 	{ ARCADE, "23" },
@@ -123,7 +125,20 @@ const std::map<PlatformId, std::string> gamesdb_new_platformid_map{
 	{ DAPHNE, "23" },
 
 	{ SUPER_NINTENDO_MSU1, "6" },
+	{ LCD_GAMES, "4951" },
 
+	{ FUJITSU_FM7, "4978" },
+	{ CASIO_PV1000, "4964" },
+	{ TIGER_GAMECOM, "4940" },
+	{ ENTEX_ADVENTURE_VISION, "4974" },
+	{ EMERSON_ARCADIA_2001, "4963" },
+	{ VTECH_CREATIVISION, "5005" },
+	{ VTECH_VSMILE, "4988" },
+	{ GAMATE, "5004" },
+	{ CREATONIC_MEGA_DUCK, "4948" },
+	{ TOMY_TUTOR, "4960" },
+	{ APF_MP_1000, "4969" }
+		
 	/* Non existing systems
 	{ AMIGACDTV, "129" },
 	{ CAVESTORY, "135" },
@@ -144,6 +159,19 @@ const std::map<PlatformId, std::string> gamesdb_new_platformid_map{
 	*/
 };
 
+const std::set<Scraper::ScraperMediaSource>& TheGamesDBScraper::getSupportedMedias()
+{
+	static std::set<ScraperMediaSource> mdds = {
+		ScraperMediaSource::Screenshot,
+		ScraperMediaSource::Box2d,
+		ScraperMediaSource::Wheel,
+		ScraperMediaSource::FanArt,
+		ScraperMediaSource::TitleShot
+	};
+
+	return mdds;
+}
+
 bool TheGamesDBScraper::isSupportedPlatform(SystemData* system)
 {
 	std::string platformQueryParam;
@@ -152,26 +180,6 @@ bool TheGamesDBScraper::isSupportedPlatform(SystemData* system)
 	for (auto platform : platforms)
 		if (gamesdb_new_platformid_map.find(platform) != gamesdb_new_platformid_map.cend())
 			return true;
-
-	return false;
-}
-
-bool TheGamesDBScraper::hasMissingMedia(FileData* file)
-{
-	if (!Settings::getInstance()->getString("ScrapperImageSrc").empty() && !Utils::FileSystem::exists(file->getMetadata(MetaDataId::Image)))
-		return true;
-
-	if (!Settings::getInstance()->getString("ScrapperThumbSrc").empty() && !Utils::FileSystem::exists(file->getMetadata(MetaDataId::Thumbnail)))
-		return true;
-
-	if (!Settings::getInstance()->getString("ScrapperLogoSrc").empty() && !Utils::FileSystem::exists(file->getMetadata(MetaDataId::Marquee)))
-		return true;
-
-	if (Settings::getInstance()->getBool("ScrapeFanart") && !Utils::FileSystem::exists(file->getMetadata(MetaDataId::FanArt)))
-		return true;
-
-	if (Settings::getInstance()->getBool("ScrapeTitleShot") && !Utils::FileSystem::exists(file->getMetadata(MetaDataId::TitleShot)))
-		return true;
 
 	return false;
 }

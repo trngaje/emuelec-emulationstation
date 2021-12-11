@@ -7,6 +7,7 @@
 #include <pugixml/src/pugixml.hpp>
 #include <algorithm>
 #include <vector>
+#include "utils/StringUtil.h"
 
 bool Settings::DebugText = false;
 bool Settings::DebugImage = false;
@@ -14,6 +15,7 @@ bool Settings::DebugGrid = false;
 
 Settings* Settings::sInstance = NULL;
 static std::string mEmptyString = "";
+
 
 // these values are NOT saved to es_settings.xml
 // since they're set through command-line arguments, and not the in-program settings menu
@@ -24,6 +26,7 @@ std::vector<const char*> settings_dont_save {
 	{ "IgnoreGamelist" },
 	{ "HideConsole" },
 	{ "ShowExit" },
+	{ "ExitOnRebootRequired" },
 	{ "SplashScreen" },
 	{ "SplashScreenProgress" },
 	// { "VSync" },
@@ -65,8 +68,10 @@ void Settings::setDefaults()
 	mBoolMap["ParseGamelistOnly"] = false;
 	mBoolMap["ShowHiddenFiles"] = false;
 	mBoolMap["ShowParentFolder"] = true;
+	mBoolMap["IgnoreLeadingArticles"] = false;
 	mBoolMap["DrawFramerate"] = false;
 	mBoolMap["ShowExit"] = true;
+	mBoolMap["ExitOnRebootRequired"] = false;
 	mBoolMap["Windowed"] = false;
 	mBoolMap["SplashScreen"] = true;
 	mBoolMap["SplashScreenProgress"] = true;
@@ -80,6 +85,7 @@ void Settings::setDefaults()
 	mBoolMap["ShowOnlyExit"] = false;
 	mBoolMap["FullscreenBorderless"] = false;
 #endif
+	mBoolMap["TTS"] = false;
 
 	mIntMap["MonitorID"] = -1;
 
@@ -138,12 +144,12 @@ void Settings::setDefaults()
 #if defined(_WIN32) || defined(TINKERBOARD) || defined(X86) || defined(X86_64) || defined(ODROIDN2) || defined(ODROIDC2) || defined(ODROIDXU4) || defined(RPI4)
 	// Boards > 1Gb RAM
 	mIntMap["MaxVRAM"] = 256;
-#elif defined(ODROIDGOA) || defined(RPI2) || defined(RPI3) || defined(ROCKPRO64)
+#elif defined(ODROIDGOA) || defined(GAMEFORCE) || defined(RK3326) || defined(RPI2) || defined(RPI3) || defined(ROCKPRO64)
 	// Boards with 1Gb RAM
 	mIntMap["MaxVRAM"] = 128;
 #elif defined(_RPI_)
 	// Rpi 0, 1
-	mIntMap["MaxVRAM"] = 80;
+	mIntMap["MaxVRAM"] = 128;
 #elif defined(_ENABLEEMUELEC)
 	// EmuELEC
 	mIntMap["MaxVRAM"] = 180;
@@ -260,6 +266,7 @@ void Settings::setDefaults()
 	mBoolMap["ThreadedLoading"] = true;
 	mBoolMap["AsyncImages"] = true;
 	mBoolMap["PreloadUI"] = false;
+	mBoolMap["PreloadMedias"] = false;	
 	mBoolMap["OptimizeVRAM"] = true;
 	mBoolMap["OptimizeVideo"] = true;
 
@@ -298,6 +305,9 @@ void Settings::setDefaults()
 	mIntMap["audio.display_titles_time"] = 10;
 
 	mBoolMap["NetPlayCheckIndexesAtStart"] = false;
+	mBoolMap["CheevosCheckIndexesAtStart"] = false;	
+
+	mBoolMap["AllImagesAsync"] = true;
 
 #if WIN32
 	mBoolMap["updates.enabled"] = true;
@@ -323,7 +333,7 @@ void Settings::setDefaults()
 
 // batocera
 template <typename K, typename V>
-void saveMap(pugi::xml_node &node, std::map<K, V>& map, const char* type, std::map<K, V>& defaultMap)
+void saveMap(pugi::xml_node &node, std::map<K, V>& map, const char* type, std::map<K, V>& defaultMap, V defaultValue)
 {
 	for(auto iter = map.cbegin(); iter != map.cend(); iter++)
 	{
@@ -333,6 +343,9 @@ void saveMap(pugi::xml_node &node, std::map<K, V>& map, const char* type, std::m
 
 		auto def = defaultMap.find(iter->first);
 		if (def != defaultMap.cend() && def->second == iter->second)
+			continue;
+
+		if (def == defaultMap.cend() && iter->second == defaultValue)
 			continue;
 
 		pugi::xml_node parent_node= node.append_child(type);
@@ -357,9 +370,9 @@ bool Settings::saveFile()
 
 	pugi::xml_node config = doc.append_child("config"); // batocera, root element
 
-	saveMap<std::string, bool>(config, mBoolMap, "bool", mDefaultBoolMap);
-	saveMap<std::string, int>(config, mIntMap, "int", mDefaultIntMap);
-	saveMap<std::string, float>(config, mFloatMap, "float", mDefaultFloatMap);
+	saveMap<std::string, bool>(config, mBoolMap, "bool", mDefaultBoolMap, false);
+	saveMap<std::string, int>(config, mIntMap, "int", mDefaultIntMap, 0);
+	saveMap<std::string, float>(config, mFloatMap, "float", mDefaultFloatMap, 0);
 
 	//saveMap<std::string, std::string>(config, mStringMap, "string");
 	for(auto iter = mStringMap.cbegin(); iter != mStringMap.cend(); iter++)

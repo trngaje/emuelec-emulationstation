@@ -95,7 +95,8 @@ public:
 		EVMAPY = 14,
 		THEMESDOWNLOADER = 15,
 		THEBEZELPROJECT = 16,
-		PADSINFO = 17
+		PADSINFO = 17,
+		BATOCERAPREGAMELISTSHOOK = 18
 	};
 
 	virtual bool isScriptingSupported(ScriptId script);
@@ -160,12 +161,19 @@ public:
 
     bool setStorage(std::string basic_string);
 
+	bool setButtonColorGameForce(std::string basic_string);
+
+	bool setPowerLedGameForce(std::string basic_string);
+
     bool forgetBluetoothControllers();
 
     /* audio card */
     bool setAudioOutputDevice(std::string device);
     std::vector<std::string> getAvailableAudioOutputDevices();
     std::string getCurrentAudioOutputDevice();
+    bool setAudioOutputProfile(std::string profile);
+    std::vector<std::string> getAvailableAudioOutputProfiles();
+    std::string getCurrentAudioOutputProfile();
 
     /* video output */
     std::vector<std::string> getAvailableVideoOutputDevices();
@@ -195,6 +203,8 @@ public:
 	void updateBatoceraStorePackageList();
 	void refreshBatoceraStorePackageList();
 
+	void callBatoceraPreGameListsHook();
+
 	bool	getBrighness(int& value);
 	void	setBrighness(int value);
 
@@ -218,6 +228,7 @@ public:
 
 	virtual std::vector<PadInfo> getPadsInfo();
 	virtual std::string getHostsName();
+	virtual bool emuKill();
 
 protected:
 	ApiSystem();

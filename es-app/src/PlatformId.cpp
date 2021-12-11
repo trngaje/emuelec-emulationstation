@@ -37,6 +37,7 @@ namespace PlatformIds
 		{ "ngpc",					NEOGEO_POCKET_COLOR },
 		{ "n3ds",					NINTENDO_3DS },
 		{ "n64",					NINTENDO_64 },
+		{ "n64dd",					NINTENDO_64_DISK_DRIVE },
 		{ "nds",					NINTENDO_DS },
 		{ "fds",					FAMICOM_DISK_SYSTEM },
 		{ "nes",					NINTENDO_ENTERTAINMENT_SYSTEM },
@@ -107,6 +108,7 @@ namespace PlatformIds
 		{ "oricatmos",				ORICATMOS },
 		{ "tyrquake",				QUAKE },
 		{ "mrboom",					MRBOOM },
+		{ "sonicretro",					SONIC },
 		{ "cannonball",					CANNONBALL },
 
 		// windows specific systems & names
@@ -148,16 +150,36 @@ namespace PlatformIds
 		{ "cpet",					COMMODORE_PET },
 		{ "atom",					ACORN_ATOM },
 		{ "bbcmicro",				ACORN_BBC_MICRO },
+		{ "bbc",					ACORN_BBC_MICRO },
 		{ "electron",				ACORN_ELECTRON },
 		{ "ngage",					NOKIA_NGAGE },
+		{ "astrocde",				ASTROCADE },
 		{ "astrocade",				ASTROCADE },
 		{ "archimedes",				ARCHIMEDES },			
 		{ "adam",					ADAM },
 
 		{ "fmtowns",				FMTOWNS },
 		{ "cdi",					PHILIPS_CDI },			
-
+		{ "fm7",					FUJITSU_FM7 },
+		{ "pv1000",					CASIO_PV1000 },
+		{ "gamecom",				TIGER_GAMECOM },
+		{ "advision",				ENTEX_ADVENTURE_VISION },			
+		{ "arcadia",				EMERSON_ARCADIA_2001 },
+		{ "lcdgames",				LCD_GAMES },
+		{ "crvision",				VTECH_CREATIVISION },			
+		{ "creativision",			VTECH_CREATIVISION },			
+		{ "vsmile",					VTECH_VSMILE },
+						
 		{ "snes-msu1",				SUPER_NINTENDO_MSU1 },
+
+		{ "gamate",					GAMATE },
+		{ "gmaster",				HARTUNG_GAME_MASTER },
+		{ "megaduck",				CREATONIC_MEGA_DUCK },
+		{ "supracan",				FUNTECH_SUPER_A_CAN },
+		{ "tutor",					TOMY_TUTOR },
+		{ "apfm1000",				APF_MP_1000 },
+		{ "camplynx",				CAMPUTER_LYNX },
+		{ "gamepock",				EPOCH_GAMEPOCKET },	
 
 		{ "ignore",					PLATFORM_IGNORE },
 		{ "invalid",				PLATFORM_COUNT }
@@ -205,7 +227,7 @@ namespace PlatformIds
 		{ 148, { "seta", "Seta" } },
 		{ 150, { "midway", "Midway" } },
 		{ 151, { "capcom", "Capcom" } },
-		{ 152, { "eighting", "Eighting / Raizing" } },		
+		{ 152, { "eighting", "Eighting/Raizing" } },		
 		{ 153, { "tecmo", "Tecmo" } },
 		{ 154, { "snk", "SNK" } },
 		{ 155, { "namco", "Namco" } },

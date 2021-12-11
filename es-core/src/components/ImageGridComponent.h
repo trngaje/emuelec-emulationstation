@@ -15,7 +15,7 @@
 #include <set>
 
 #define EXTRAITEMS 2
-#define ALLOWANIMATIONS (Settings::getInstance()->getString("TransitionStyle") != "instant")
+#define ALLOWANIMATIONS (Settings::TransitionStyle() != "instant")
 
 enum ScrollDirection
 {
@@ -28,7 +28,13 @@ enum ImageSource
 	THUMBNAIL,
 	IMAGE,
 	MARQUEE,
-	MARQUEEORTEXT
+	MARQUEEORTEXT,
+	FANART,
+	TITLESHOT,
+	BOXART,
+	CARTRIDGE,
+	BOXBACK,
+	MIX
 };
 
 enum CenterSelection
@@ -210,12 +216,12 @@ template<typename T>
 void ImageGridComponent<T>::add(const std::string& name, const std::string& imagePath, const std::string& videoPath, const std::string& marqueePath, bool favorite, bool cheevos, bool folder, bool virtualFolder, const T& obj)
 {
 	// If file system is not yet cached, it will introduce lags later ( during animations mainly ). Manage it now.
-	if (mEntries.size() < 16)
+	/*if (mEntries.size() < 16)
 	{
 		Utils::FileSystem::exists(imagePath);
 		Utils::FileSystem::exists(videoPath);
 		Utils::FileSystem::exists(marqueePath);
-	}
+	}*/
 
 	typename IList<ImageGridData, T>::Entry entry;
 	entry.name = name;
@@ -613,6 +619,18 @@ void ImageGridComponent<T>::applyTheme(const std::shared_ptr<ThemeData>& theme, 
 				mImageSource = MARQUEE;
 			else if (direction == "marqueeortext")
 				mImageSource = MARQUEEORTEXT;
+			else if (direction == "fanart")
+				mImageSource = FANART;
+			else if (direction == "titleshot")
+				mImageSource = TITLESHOT;
+			else if (direction == "boxart")
+				mImageSource = BOXART;
+			else if (direction == "cartridge")
+				mImageSource = CARTRIDGE;
+			else if (direction == "boxback")
+				mImageSource = BOXBACK;
+			else if (direction == "mix")
+				mImageSource = MIX;
 			else
 				mImageSource = THUMBNAIL;
 		}
@@ -1077,10 +1095,12 @@ void ImageGridComponent<T>::updateTileAtPos(int tilePos, int imgPos, bool allowA
 		else
 			tile->setLabel(name);		
 
+		bool preloadMedias = Settings::PreloadMedias();
+
 		bool setMarquee = true;
 
 		// Image
-		if (ResourceManager::getInstance()->fileExists(imagePath))
+		if ((preloadMedias && !imagePath.empty()) || (!preloadMedias && ResourceManager::getInstance()->fileExists(imagePath)))
 		{
 			if (mEntries.at(imgPos).data.virtualFolder)
 			{
@@ -1121,7 +1141,7 @@ void ImageGridComponent<T>::updateTileAtPos(int tilePos, int imgPos, bool allowA
 			// Marquee		
 			if (tile->hasMarquee())
 			{
-				if (!marqueePath.empty() && ResourceManager::getInstance()->fileExists(marqueePath))
+				if ((preloadMedias && !marqueePath.empty()) || (!preloadMedias && ResourceManager::getInstance()->fileExists(marqueePath)))				
 					tile->setMarquee(marqueePath);
 				else
 					tile->setMarquee("");
@@ -1136,7 +1156,7 @@ void ImageGridComponent<T>::updateTileAtPos(int tilePos, int imgPos, bool allowA
 		{			
 			std::string videoPath = mEntries.at(imgPos).data.videoPath;
 
-			if (!videoPath.empty() && ResourceManager::getInstance()->fileExists(videoPath))
+			if ((preloadMedias && !videoPath.empty()) || (!preloadMedias && ResourceManager::getInstance()->fileExists(videoPath)))
 				tile->setVideo(videoPath, mVideoDelay);
 			else
 				tile->setVideo("");

@@ -33,6 +33,7 @@ struct CustomFeature
 	std::string name;
 	std::string value;
 	std::string description;
+	std::string submenu;
 	std::vector<CustomFeatureChoice> choices;
 };
 
@@ -75,6 +76,7 @@ public:
 		autocontrollers = 262144,
 #ifdef _ENABLEEMUELEC
         vertical = 524288,
+				nativevideo = 1048576,
 #endif
 
 		all = 0x0FFFFFFF
@@ -302,6 +304,7 @@ public:
 
 	bool shouldExtractHashesFromArchives();
 
+	static std::vector<CustomFeature> mSharedFeatures;
 	static std::vector<CustomFeature> mGlobalFeatures;
 
 	bool getShowFilenames();

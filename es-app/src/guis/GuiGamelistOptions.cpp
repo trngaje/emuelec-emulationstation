@@ -76,9 +76,14 @@ GuiGamelistOptions::GuiGamelistOptions(Window* window, IGameListView* gamelist, 
 			std::vector<std::string> letters = getGamelist()->getEntriesLetters();
 			if (!letters.empty())
 			{
-				mJumpToLetterList = std::make_shared<LetterList>(mWindow, _("JUMP TO LETTER"), false); // batocera
+				mJumpToLetterList = std::make_shared<LetterList>(mWindow, _("JUMP TO GAME BEGINNING WITH THE LETTER"), false); // batocera
 
 				char curChar = (char)toupper(getGamelist()->getCursor()->getName()[0]);
+#ifdef _ENABLEEMUELEC				
+				unsigned int sortId = system->getSortId();
+				if (sortId == FileSorts::SORTNAME_ASCENDING || sortId == FileSorts::SORTNAME_DESCENDING)
+					curChar = (char)toupper(getGamelist()->getCursor()->getSortOrName()[0]);
+#endif
 
 				if (std::find(letters.begin(), letters.end(), std::string(1, curChar)) == letters.end())
 					curChar = letters.at(0)[0];
@@ -86,7 +91,7 @@ GuiGamelistOptions::GuiGamelistOptions(Window* window, IGameListView* gamelist, 
 				for (auto letter : letters)
 					mJumpToLetterList->add(letter, letter[0], letter[0] == curChar);
 
-				row.addElement(std::make_shared<TextComponent>(mWindow, _("JUMP TO LETTER"), theme->Text.font, theme->Text.color), true); // batocera
+				row.addElement(std::make_shared<TextComponent>(mWindow, _("JUMP TO GAME BEGINNING WITH THE LETTER"), theme->Text.font, theme->Text.color), true); // batocera
 				row.addElement(mJumpToLetterList, false);
 				row.input_handler = [&](InputConfig* config, Input input)
 				{
@@ -125,6 +130,21 @@ GuiGamelistOptions::GuiGamelistOptions(Window* window, IGameListView* gamelist, 
 		{
 			const FileSorts::SortType& sort = FileSorts::getSortTypes().at(i);
 			mListSort->add(sort.icon + sort.description, sort.id, sort.id == currentSortId); // TODO - actually make the sort type persistent
+#ifdef _ENABLEEMUELEC			
+			if (i == (FileSorts::getSortTypes().size()-3))
+				break;
+			if (i == FileSorts::FILENAME_DESCENDING)
+			{
+			  {
+					const FileSorts::SortType& st = FileSorts::getSortTypes().at(FileSorts::SORTNAME_ASCENDING);
+					mListSort->add(st.icon + st.description, st.id, st.id == currentSortId);
+				}
+				{
+					const FileSorts::SortType& st = FileSorts::getSortTypes().at(FileSorts::SORTNAME_DESCENDING);
+					mListSort->add(st.icon + st.description, st.id, st.id == currentSortId);
+				}
+			}
+#endif
 		}
 
 		mMenu.addWithLabel(_("SORT GAMES BY"), mListSort); // batocera	
@@ -282,7 +302,7 @@ GuiGamelistOptions::GuiGamelistOptions(Window* window, IGameListView* gamelist, 
 			if (showViewStyle)
 				mMenu.addWithLabel(_("GAMELIST VIEW STYLE"), mViewMode);
 
-			mMenu.addEntry(_("VIEW CUSTOMISATION"), true, [this, system]()
+			mMenu.addEntry(_("VIEW CUSTOMIZATION"), true, [this, system]()
 			{
 				GuiMenu::openThemeConfiguration(mWindow, this, nullptr, system->getThemeFolder());
 			});
@@ -296,25 +316,9 @@ GuiGamelistOptions::GuiGamelistOptions(Window* window, IGameListView* gamelist, 
 		if (!fromPlaceholder)
 		{
 			auto srcSystem = file->getSourceFileData()->getSystem();
-			auto sysOptions = mSystem->isGroupSystem() ? srcSystem : mSystem;
+			auto sysOptions = !mSystem->isGameSystem() || mSystem->isGroupSystem() ? srcSystem : mSystem;
 
 			bool showSystemOptions = ApiSystem::getInstance()->isScriptingSupported(ApiSystem::GAMESETTINGS) && (sysOptions->hasFeatures() || sysOptions->hasEmulatorSelection());
-			/*
-			bool showGameOptions = (file != nullptr && file->getType() != FOLDER);
-
-			if (showGameOptions || showSystemOptions)
-				mMenu.addGroup(_("OPTIONS"));
-
-			if (showGameOptions)
-			{
-				mMenu.addEntry(_("GAME OPTIONS"), true, [this, file] 
-				{
-					Window* window = mWindow;
-					window->pushGui(new GuiGameOptions(window, file));
-					delete this;
-				});
-			}
-			*/
 			if (showSystemOptions)
 			{
 				mMenu.addGroup(_("OPTIONS"));
@@ -334,7 +338,17 @@ GuiGamelistOptions::GuiGamelistOptions(Window* window, IGameListView* gamelist, 
 					});
 				}
 
-				mMenu.addEntry(_("ADVANCED SYSTEM OPTIONS"), true, [this, sysOptions] { GuiMenu::popSystemConfigurationGui(mWindow, sysOptions); });
+				/* FCA : Tried to show one item by group child system -> I personnally don't like it at all
+				if (mSystem->isGroupSystem())
+				{
+					for (auto child : SystemData::sSystemVector)
+					{
+						if (child->getParentGroupSystem() == mSystem)
+							mMenu.addEntry(_("ADVANCED SYSTEM OPTIONS") + " : " + child->getFullName(), true, [this, child] { GuiMenu::popSystemConfigurationGui(mWindow, child); });
+					}
+				}
+				else*/
+					mMenu.addEntry(_("ADVANCED SYSTEM OPTIONS"), true, [this, sysOptions] { GuiMenu::popSystemConfigurationGui(mWindow, sysOptions); });
 			}
 		}
 	}
@@ -522,7 +536,7 @@ void GuiGamelistOptions::openMetaDataEd()
 {
 	if (ThreadedScraper::isRunning() || ThreadedHasher::isRunning())
 	{
-		mWindow->pushGui(new GuiMsgBox(mWindow, _("THIS FUNCTION IS DISABLED WHEN SCRAPING IS RUNNING")));
+		mWindow->pushGui(new GuiMsgBox(mWindow, _("THIS FUNCTION IS DISABLED WHILE THE SCRAPER IS RUNNING")));
 		return;
 	}
 
@@ -565,6 +579,16 @@ void GuiGamelistOptions::openMetaDataEd()
 		std::bind(&ViewController::onFileChanged, ViewController::get(), file, FILE_METADATA_CHANGED), deleteBtnFunc, file));
 }
 
+#ifdef _ENABLEEMUELEC
+char getSortLetter(int sortId, FileData* fData) {
+	if (sortId == FileSorts::SORTNAME_ASCENDING || sortId == FileSorts::SORTNAME_DESCENDING)	
+		return toupper(fData->getSortOrName()[0]);
+	if (sortId == FileSorts::FILENAME_ASCENDING || sortId == FileSorts::FILENAME_DESCENDING)	
+		return toupper(fData->getName()[0]);
+	return 0;
+}
+#endif
+
 void GuiGamelistOptions::jumpToLetter()
 {
 	char letter = mJumpToLetterList->getSelected();
@@ -572,9 +596,26 @@ void GuiGamelistOptions::jumpToLetter()
 
 	if (mListSort->getSelected() != 0)
 	{
+#ifdef _ENABLEEMUELEC
+				int nameSorts[4] = {
+					FileSorts::FILENAME_ASCENDING,
+					FileSorts::FILENAME_DESCENDING,
+					FileSorts::SORTNAME_ASCENDING,
+					FileSorts::SORTNAME_DESCENDING};
+				int val = mListSort->getSelected();
+				if (std::find(std::begin(nameSorts), std::end(nameSorts), val) != std::end(nameSorts))
+				{
+					mSystem->setSortId(val);
+				}
+				else {
+					mListSort->selectFirstItem();
+					mSystem->setSortId(0);
+				}
+#else
 		mListSort->selectFirstItem();
 		mSystem->setSortId(0);
-		
+#endif
+
 		FolderData* root = mSystem->getRootFolder();
 		/*
 		const FolderData::SortType& sort = FileSorts::getSortTypes().at(0);
@@ -590,6 +631,48 @@ void GuiGamelistOptions::jumpToLetter()
 	long max = (long)files.size() - 1;
 	long mid = 0;
 
+#ifdef _ENABLEEMUELEC
+	unsigned int sortId = mSystem->getSortId();
+	bool asc = true;
+	if (sortId == FileSorts::SORTNAME_DESCENDING || sortId == FileSorts::FILENAME_DESCENDING) {
+		asc = false;
+	}
+
+	{
+		char letter = mJumpToLetterList->getSelected();
+		while(max >= min)
+		{
+			mid = ((max - min) / 2) + min;
+
+			char checkLetter = getSortLetter(sortId, files.at(mid));
+			if (checkLetter == 0)
+				continue;
+
+			bool midLet = (mid > 0 && letter == getSortLetter(sortId, files.at(mid-1)));
+			if (asc) {
+				if(checkLetter < letter)
+					min = mid + 1;
+				else if(checkLetter > letter || midLet)
+					max = mid - 1;
+				else
+					break;
+			}
+			else {
+				if(checkLetter > letter)
+					min = mid + 1;
+				else if(checkLetter < letter || midLet)
+					max = mid - 1;
+				else
+					break;
+			}
+		}
+	}
+	gamelist->setCursor(files.at(mid));
+	delete this;
+	return;
+
+#endif
+
 	while(max >= min)
 	{
 		mid = ((max - min) / 2) + min;
@@ -599,7 +682,6 @@ void GuiGamelistOptions::jumpToLetter()
 			continue;
 
 		char checkLetter = (char)toupper(files.at(mid)->getName()[0]);
-
 		if(checkLetter < letter)
 			min = mid + 1;
 		else if(checkLetter > letter || (mid > 0 && (letter == toupper(files.at(mid - 1)->getName()[0]))))
@@ -715,7 +797,7 @@ void GuiGamelistOptions::deleteCollection()
 	if (getCustomCollectionName() == CollectionSystemManager::get()->getCustomCollectionsBundle()->getName())
 		return;
 
-	mWindow->pushGui(new GuiMsgBox(mWindow, _("ARE YOU SURE YOU WANT TO DELETE THIS ITEM ?"), _("YES"),
+	mWindow->pushGui(new GuiMsgBox(mWindow, _("ARE YOU SURE YOU WANT TO DELETE THIS ITEM?"), _("YES"),
 		[this]
 		{
 			std::map<std::string, CollectionSystemData> customCollections = CollectionSystemManager::get()->getCustomCollectionSystems();

@@ -21,6 +21,7 @@
 #include "resources/TextureDataManager.h"
 #include "guis/GuiTextEditPopup.h"
 #include "guis/GuiTextEditPopupKeyboard.h"
+#include "TextToSpeech.h"
 
 // buffer values for scrolling velocity (left, stopped, right)
 const int logoBuffersLeft[] = { -5, -2, -1 };
@@ -749,7 +750,7 @@ void SystemView::updateExtraTextBinding()
 	}
 }
 
-void SystemView::onCursorChanged(const CursorState& /*state*/)
+void SystemView::onCursorChanged(const CursorState& state)
 {
 	if (AudioManager::isInitialized())
 		AudioManager::getInstance()->changePlaylist(getSelected()->getTheme());
@@ -779,7 +780,7 @@ void SystemView::onCursorChanged(const CursorState& /*state*/)
 	cancelAnimation(1);
 	cancelAnimation(2);
 
-	std::string transition_style = Settings::getInstance()->getString("TransitionStyle");
+	std::string transition_style = Settings::TransitionStyle();
 	if (transition_style == "auto")
 	{
 		if (mCarousel.defaultTransition == "instant" || mCarousel.defaultTransition == "fade" || mCarousel.defaultTransition == "slide" || mCarousel.defaultTransition == "fade & slide")
@@ -851,6 +852,10 @@ void SystemView::onCursorChanged(const CursorState& /*state*/)
 	if (mLastCursor == mCursor)
 		return;
 
+	// tts
+	if(state == CURSOR_STOPPED)
+	  TextToSpeech::getInstance()->say(getSelected()->getFullName());
+
 	if (!mCarousel.scrollSound.empty())
 		Sound::get(mCarousel.scrollSound)->play();
 
@@ -903,7 +908,7 @@ void SystemView::onCursorChanged(const CursorState& /*state*/)
 
 	Animation* anim;
 	bool move_carousel = Settings::getInstance()->getBool("MoveCarousel");
-	if (Settings::getInstance()->getString("PowerSaverMode") == "instant")
+	if (Settings::PowerSaverMode() == "instant")
 		move_carousel = false;
 
 	if (transition_style == "fade" || transition_style == "fade & slide")
@@ -1028,7 +1033,7 @@ std::vector<HelpPrompt> SystemView::getHelpPrompts()
 	if (netPlay)
 	{
 		prompts.push_back(HelpPrompt("x", _("NETPLAY")));
-		prompts.push_back(HelpPrompt("y", _("SEARCH") + std::string(" / ") + _("RANDOM"))); // QUICK 
+		prompts.push_back(HelpPrompt("y", _("SEARCH") + std::string("/") + _("RANDOM"))); // QUICK 
 	}
 	else
 	{
@@ -1043,6 +1048,8 @@ std::vector<HelpPrompt> SystemView::getHelpPrompts()
 		prompts.push_back(HelpPrompt("F1", _("FILES")));
 	}
 #endif
+
+	// prompts.push_back(HelpPrompt("F3", _("SCREEN READER"))); -> Not interesting since most devices don't have Keyboard
 
 	return prompts;
 }
@@ -1731,6 +1738,10 @@ void SystemView::onShow()
 
 	for (auto sb : mStaticVideoBackgrounds)
 		sb->onShow();
+
+	if (getSelected() != nullptr)
+		TextToSpeech::getInstance()->say(getSelected()->getFullName());
+
 }
 
 void SystemView::onHide()

@@ -27,6 +27,7 @@
 #include "guis/GuiMsgBox.h"
 #include "utils/ThreadPool.h"
 #include <SDL_timer.h>
+#include "TextToSpeech.h"
 
 #ifdef _ENABLEEMUELEC
 #include "ApiSystem.h"
@@ -37,6 +38,14 @@ ViewController* ViewController::sInstance = nullptr;
 ViewController* ViewController::get()
 {
 	return sInstance;
+}
+
+void ViewController::deinit()
+{
+	if (sInstance != nullptr)
+		delete sInstance;
+
+	sInstance = nullptr;
 }
 
 void ViewController::init(Window* window)
@@ -156,32 +165,32 @@ void ViewController::goToSystemView(SystemData* system, bool forceImmediate)
 {
 	SystemData* dest = system;
 
+	int systemId = getSystemId(dest);
+
 	if (system->isCollection())
 	{
 		SystemData* bundle = CollectionSystemManager::get()->getCustomCollectionsBundle();
-		if (bundle != nullptr)
-		{
-			for (auto child : bundle->getRootFolder()->getChildren())
-			{
-				if (child->getType() == FOLDER && child->getName() == system->getName())
-				{
-					dest = bundle;
-					break;
-				}
-			}
-		}
+		if (bundle != nullptr && systemId < 0)
+			dest = bundle;
 	}
 
 	// Tell any current view it's about to be hidden
 	if (mCurrentView)
 		mCurrentView->onHide();
 
+	// Realign system view
 	auto systemList = getSystemListView();
+	systemList->setPosition(systemId * (float)Renderer::getScreenWidth(), systemList->getPosition().y());
+	
+	// Realign every gamelist views
+	for (auto gameList : mGameListViews)
+	{
+		int id = getSystemId(gameList.first);
+		gameList.second->setPosition(id * (float)Renderer::getScreenWidth(), (float)Renderer::getScreenHeight() * 2);
+	}
 
-	if (mState.viewing == GAME_LIST && mCurrentView)
-		systemList->setPosition(mCurrentView->getPosition().x(), systemList->getPosition().y());
-	else
-		systemList->setPosition(getSystemId(dest) * (float)Renderer::getScreenWidth(), systemList->getPosition().y());
+	// Realign translation
+	mCamera.translation().x() = -(systemId * (float)Renderer::getScreenWidth());
 
 	mState.viewing = SYSTEM_SELECT;
 	mState.system = dest;
@@ -189,10 +198,6 @@ void ViewController::goToSystemView(SystemData* system, bool forceImmediate)
 	systemList->goToSystem(dest, false);
 
 	mCurrentView = systemList;
-
-	// mCurrentView->onShow();
-//	PowerSaver::pause();
-//	PowerSaver::resume();
 
 	playViewTransition(forceImmediate);
 }
@@ -252,7 +257,8 @@ void ViewController::goToGameList(SystemData* system, bool forceImmediate)
 
 	std::shared_ptr<IGameListView> view = getGameListView(destinationSystem);
 
-	if(mState.viewing == SYSTEM_SELECT)
+
+	if (mState.viewing == SYSTEM_SELECT)
 	{
 		// move system list
 		auto sysList = getSystemListView();
@@ -324,7 +330,7 @@ void ViewController::goToGameList(SystemData* system, bool forceImmediate)
 
 	mDeferPlayViewTransitionTo = nullptr;
 
-	if (forceImmediate || Settings::getInstance()->getString("TransitionStyle") == "fade")
+	if (forceImmediate || Settings::TransitionStyle() == "fade")
 	{
 		if (mCurrentView)
 			mCurrentView->onHide();
@@ -352,8 +358,17 @@ void ViewController::playViewTransition(bool forceImmediate)
 	if(target == -mCamera.translation() && !isAnimationPlaying(0))
 		return;
 
-	std::string transition_style = Settings::getInstance()->getString("TransitionStyle");
-	if (Settings::getInstance()->getString("PowerSaverMode") == "instant")
+	std::string transition_style = Settings::TransitionStyle();
+
+	// check <theme defaultTransition> value
+	if ((transition_style.empty() || transition_style == "auto") && getState().system != nullptr && getState().system->getTheme() != nullptr)
+	{
+		auto defaultTransition = getState().system->getTheme()->getDefaultTransition();
+		if (!defaultTransition.empty() && defaultTransition != "auto")
+			transition_style = defaultTransition;
+	}
+
+	if (Settings::PowerSaverMode() == "instant")
 		transition_style = "instant";
 
 	if (transition_style == "fade & slide")
@@ -414,6 +429,18 @@ void ViewController::onFileChanged(FileData* file, FileChangeType change)
 	auto it = mGameListViews.find(sourceSystem);
 	if (it != mGameListViews.cend())
 		it->second->onFileChanged(file, change);
+	else
+	{
+		// System is in a group ?
+		for (auto gameListView : mGameListViews)
+		{
+			if (gameListView.first->isGroupSystem() && gameListView.first->getRootFolder()->FindByPath(key))
+			{
+				gameListView.second->onFileChanged(file, change);
+				break;
+			}
+		}
+	}
 
 	for (auto collection : CollectionSystemManager::get()->getAutoCollectionSystems())
 	{		
@@ -450,7 +477,7 @@ bool ViewController::checkLaunchOptions(FileData* game, LaunchGameOptions option
 
 	if (!game->isExtensionCompatible())
 	{
-		auto gui = new GuiMsgBox(mWindow, _("WARNING : THIS GAME'S FORMAT IS NOT SUPPORTED BY THE CURRENT EMULATOR/CORE.\nDO YOU WANT TO LAUNCH IT ANYWAY ?"),
+		auto gui = new GuiMsgBox(mWindow, _("WARNING: THE EMULATOR/CORE CURRENTLY SET DOES NOT SUPPORT THIS GAME'S FILE FORMAT.\nDO YOU WANT TO LAUNCH IT ANYWAY?"),
 			_("YES"), [this, game, options, center] { launch(game, options, center, false); },
 			_("NO"), nullptr, ICON_ERROR);
 
@@ -470,7 +497,7 @@ bool ViewController::checkLaunchOptions(FileData* game, LaunchGameOptions option
 				bool hasMissing = std::find_if(it->bios.cbegin(), it->bios.cend(), [&systemName](const BiosFile& x) { return x.status == "MISSING"; }) != it->bios.cend();
 				if (hasMissing)
 				{
-					auto gui = new GuiMsgBox(mWindow, _("WARNING : THE SYSTEM HAS MISSING BIOS AND THE GAME MAY NOT WORK CORRECTLY.\nDO YOU WANT TO LAUNCH IT ANYWAY ?"),
+					auto gui = new GuiMsgBox(mWindow, _("WARNING: THE SYSTEM HAS MISSING BIOS FILE(S) AND THE GAME MAY NOT WORK CORRECTLY.\nDO YOU WANT TO LAUNCH IT ANYWAY?"),
 						_("YES"), [this, game, options, center] { launch(game, options, center, false); },
 						_("NO"), nullptr, ICON_ERROR);
 
@@ -499,7 +526,7 @@ void ViewController::launch(FileData* game, LaunchGameOptions options, Vector3f 
 	{
 		auto ext = Utils::String::toLower(Utils::FileSystem::getExtension(game->getPath()));
 
-		if (ext == ".mp4" || ext == ".avi" || ext == ".mkv")
+		if (ext == ".mp4" || ext == ".avi" || ext == ".mkv" || ext == ".webm")
 			GuiVideoViewer::playVideo(mWindow, game->getPath());
 		else if (ext == ".pdf")
 			GuiImageViewer::showPdf(mWindow, game->getPath());
@@ -535,17 +562,17 @@ void ViewController::launch(FileData* game, LaunchGameOptions options, Vector3f 
 	if (!Settings::getInstance()->getBool("HideWindow"))
 		mWindow->setCustomSplashScreen(game->getImagePath(), game->getName());
 
-	std::string transition_style = Settings::getInstance()->getString("GameTransitionStyle");
+	std::string transition_style = Settings::GameTransitionStyle();
 	if (transition_style.empty() || transition_style == "auto")
-		transition_style = Settings::getInstance()->getString("TransitionStyle");
+		transition_style = Settings::TransitionStyle();
 	
-	if (Settings::getInstance()->getString("PowerSaverMode") == "instant")
+	if (Settings::PowerSaverMode() == "instant")
 		transition_style = "instant";
 
 	if(transition_style == "auto")
 		transition_style = "slide";
 
-	if (Settings::getInstance()->getString("PowerSaverMode") == "instant")
+	if (Settings::PowerSaverMode() == "instant")
 		transition_style = "instant";
 
 	if (transition_style == "fade & slide")
@@ -845,6 +872,12 @@ bool ViewController::input(InputConfig* config, Input input)
 		return true;
 	}
 
+	if (config->getDeviceId() == DEVICE_KEYBOARD && input.value && input.id == SDLK_F3)
+	  {
+	    Settings::getInstance()->setBool("TTS", TextToSpeech::getInstance()->toogle());
+	    Settings::getInstance()->saveFile();
+	  }
+
 	// open menu
 	if(config->isMappedTo("start", input) && input.value != 0) // batocera
 	{
@@ -976,7 +1009,10 @@ void ViewController::preload()
 	for(auto it = SystemData::sSystemVector.cbegin(); it != SystemData::sSystemVector.cend(); it++)
 	{		
 		if ((*it)->isGroupChildSystem() || !(*it)->isVisible())
+		{
+			i++;
 			continue;
+		}
 
 		if (splash)
 		{
@@ -1272,7 +1308,7 @@ void ViewController::onScreenSaverDeactivate()
 		mCurrentView->onScreenSaverDeactivate();
 }
 
-void ViewController::reloadAllGames(Window* window, bool deleteCurrentGui)
+void ViewController::reloadAllGames(Window* window, bool deleteCurrentGui, bool doCallExternalTriggers)
 {
 	if (sInstance == nullptr)
 		return;
@@ -1300,6 +1336,12 @@ void ViewController::reloadAllGames(Window* window, bool deleteCurrentGui)
 		if (gui != sInstance)
 			delete gui;
 	}
+
+	ViewController::deinit();
+
+	// call external triggers
+	if (doCallExternalTriggers && ApiSystem::getInstance()->isScriptingSupported(ApiSystem::BATOCERAPREGAMELISTSHOOK))
+		ApiSystem::getInstance()->callBatoceraPreGameListsHook();
 
 	ViewController::init(window);
 	

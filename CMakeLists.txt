@@ -8,8 +8,10 @@ option(CEC "CEC" ON)
 option(BCM "BCM host" OFF)
 
 # batocera
-option(ENABLE_FILEMANAGER "Set to ON to enable f1 shortcut for filesystem")
-option(DISABLE_KODI "Set to ON to disable kodi in menu")
+option(ENABLE_FILEMANAGER "Set to ON to enable f1 shortcut for filesystem" OFF)
+option(DISABLE_KODI "Set to ON to disable kodi in menu" OFF)
+option(ENABLE_PULSE "Set to ON to enable pulse audio (versus alsa)" OFF)
+option(ENABLE_TTS "Set to ON to enable text to speech" OFF)
 
 # emuelec
 option(ENABLE_EMUELEC "Set to ON to enable EmuELEC changes" ${ENABLE_EMUELEC})
@@ -41,7 +43,7 @@ endif()
 
 # batocera / kodi menu
 # disable kodi
-if("${DISABLE_KODI}" STREQUAL "1")
+if(DISABLE_KODI)
   MESSAGE("kodi disabled")
 else()
   add_definitions(-D_ENABLE_KODI_)
@@ -49,7 +51,7 @@ endif()
 
 # batocera / file manager f1 button
 # disable file manager
-if("${ENABLE_FILEMANAGER}" STREQUAL "1")
+if(ENABLE_FILEMANAGER)
   MESSAGE("file manager enabled")
   add_definitions(-D_ENABLE_FILEMANAGER_)
 endif()
@@ -119,6 +121,25 @@ find_package(CURL REQUIRED)
 find_package(VLC REQUIRED)
 find_package(RapidJSON REQUIRED)
 
+if(ENABLE_PULSE)
+  MESSAGE("pulse audio enabled")
+  find_package(PulseAudio REQUIRED)
+  add_definitions(-D_ENABLE_PULSE_)
+else()
+  MESSAGE("pulse audio disabled")
+endif()
+
+if(ENABLE_TTS)
+  MESSAGE("tts enabled")
+  find_library(LIBESPEAK_LIBRARIES NAMES espeak REQUIRED)
+  if("${LIBESPEAK_LIBRARIES}" STREQUAL "LIBESPEAK_LIBRARIES-NOTFOUND")
+    MESSAGE(FATAL_ERROR "espeak not found")
+  endif()
+  add_definitions(-D_ENABLE_TTS_)
+else()
+  MESSAGE("tts disabled")
+endif()
+
 if(CEC)
   find_package(libCEC)
 endif()
@@ -160,6 +181,10 @@ if(DEFINED CHEEVOS_DEV_LOGIN)
     add_definitions(-DCHEEVOS_DEV_LOGIN="${CHEEVOS_DEV_LOGIN}")
 endif()
 
+if(DEFINED HFS_DEV_LOGIN)
+    add_definitions(-DHFS_DEV_LOGIN="${HFS_DEV_LOGIN}")
+endif()
+
 #-------------------------------------------------------------------------------
 
 if(MSVC)
@@ -180,10 +205,10 @@ if(CMAKE_COMPILER_IS_GNUCXX)
 
     #set up compiler flags for GCC
 if (CMAKE_BUILD_TYPE MATCHES Debug)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wno-attributes -O0") #support C++11 for std::, optimize
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wno-attributes -O0") #support C++14 for std::, optimize
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -O0")
 else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wno-attributes -O3") #support C++11 for std::, optimize
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wno-attributes -O3") #support C++14 for std::, optimize
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -O3")  #-s = strip binary
 endif()
 endif()
@@ -212,8 +237,9 @@ set(COMMON_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/es-core/src
 )
 
-if(NOT DEFINED MSVC)
+if(ENABLE_PULSE)
  LIST(APPEND COMMON_INCLUDE_DIRS
+    ${PULSEAUDIO_INCLUDE_DIR}
       )
 endif()
 
@@ -289,8 +315,15 @@ set(COMMON_LIBRARIES
 	libcheevos	
 )
 
-if(NOT DEFINED MSVC)
+if(ENABLE_PULSE)
  LIST(APPEND COMMON_LIBRARIES
+    ${PULSEAUDIO_LIBRARY}
+      )
+endif()
+
+if(ENABLE_TTS)
+ LIST(APPEND COMMON_LIBRARIES
+    ${LIBESPEAK_LIBRARIES}
       )
 endif()
 

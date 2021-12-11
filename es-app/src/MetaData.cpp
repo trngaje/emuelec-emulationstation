@@ -23,7 +23,9 @@ void MetaDataList::initMetadata()
 	{
 		// key,             type,                   default,            statistic,  name in GuiMetaDataEd,  prompt in GuiMetaDataEd
 		{ Name,             "name",        MD_STRING,              "",                 false,      _("Name"),                 _("enter game name"),			true },
-	//	{ SortName,         "sortname",    MD_STRING,              "",                 false,      _("sortname"),             _("enter game sort name"),	true },
+#ifdef _ENABLEEMUELEC
+		{ SortName,         "sortname",    MD_STRING,              "",                 false,      _("sortname"),             _("enter game sort name"),	true },
+#endif
 		{ Desc,             "desc",        MD_MULTILINE_STRING,    "",                 false,      _("Description"),          _("enter description"),		true },
 
 #if WIN32 && !_DEBUG
@@ -45,6 +47,7 @@ void MetaDataList::initMetadata()
 		{ Manual,			"manual",	   MD_PATH,                "",                 false,      _("Manual"),               _("enter path to manual"),     true },
 		{ Magazine,			"magazine",	   MD_PATH,                "",                 false,      _("Magazine"),             _("enter path to magazine"),     true },
 		{ Map,			    "map",	       MD_PATH,                "",                 false,      _("Map"),                  _("enter path to map"),		 true },
+		{ Bezel,            "bezel",       MD_PATH,                "",                 false,      _("Bezel (16:9)"),         _("enter path to bezel (16:9)"),	 true },
 
 		// Non scrappable /editable medias
 		{ Cartridge,        "cartridge",   MD_PATH,                "",                 true,       _("Cartridge"),            _("enter path to cartridge"),  true },
@@ -55,19 +58,19 @@ void MetaDataList::initMetadata()
 		
 		{ Rating,           "rating",      MD_RATING,              "0.000000",         false,      _("Rating"),               _("enter rating"),			false },
 		{ ReleaseDate,      "releasedate", MD_DATE,                "not-a-date-time",  false,      _("Release date"),         _("enter release date"),		false },
-		{ Developer,        "developer",   MD_STRING,              "",                 false,      _("Developer"),            _("enter game developer"),	false },
-		{ Publisher,        "publisher",   MD_STRING,              "",                 false,      _("Publisher"),            _("enter game publisher"),	false },
+		{ Developer,        "developer",   MD_STRING,              "",                 false,      _("Developer"),            _("this game's developer"),	false },
+		{ Publisher,        "publisher",   MD_STRING,              "",                 false,      _("Publisher"),            _("this game's publisher"),	false },
 
 
 		{ Genre,            "genre",       MD_STRING,              "",                 false,      _("Genre"),                _("enter game genre"),		false }, 
-		{ Family,           "family",      MD_STRING,              "",                 false,      _("Game family"),		  _("enter game family"),		false },
+		{ Family,           "family",      MD_STRING,              "",                 false,      _("Game family"),		  _("this game's game family"),		false },
 
 		// GenreIds is not serialized
 		{ GenreIds,         "genres",      MD_STRING,              "",                 false,      _("Genres"),				  _("enter game genres"),		false },
 
-		{ ArcadeSystemName, "arcadesystemname",  MD_STRING,        "",                 false,      _("Arcade system"),        _("enter game arcade system"), false },
+		{ ArcadeSystemName, "arcadesystemname",  MD_STRING,        "",                 false,      _("Arcade system"),        _("this game's arcade system"), false },
 
-		{ Players,          "players",     MD_INT,                 "",                false,       _("Players"),              _("enter number of players"),	false },
+		{ Players,          "players",     MD_INT,                 "",                false,       _("Players"),              _("this game's number of players"),	false },
 		{ Favorite,         "favorite",    MD_BOOL,                "false",            false,      _("Favorite"),             _("enter favorite"),			false },
 		{ Hidden,           "hidden",      MD_BOOL,                "false",            false,      _("Hidden"),               _("enter hidden"),			true },
 		{ KidGame,          "kidgame",     MD_BOOL,                "false",            false,      _("Kidgame"),              _("enter kidgame"),			false },
@@ -79,9 +82,13 @@ void MetaDataList::initMetadata()
 
 		{ GameTime,         "gametime",    MD_INT,                 "0",                true,       _("Game time"),            _("how long the game has been played in total (seconds)"), false },
 
-		{ Language,         "lang",        MD_STRING,              "",                 false,       _("Languages"),            _("Languages"),				false },
-		{ Region,           "region",      MD_STRING,              "",                 false,       _("Region"),               _("Region"),					false },
-		{ Cheevos,          "cheevos",     MD_BOOL,                "false",            false,       _("Has Achievements"),     _("Has Achievements"),		false }
+		{ Language,         "lang",        MD_STRING,              "",                 false,      _("Languages"),            _("this game's languages"),				false },
+		{ Region,           "region",      MD_STRING,              "",                 false,      _("Region"),               _("this game's region"),					false },
+
+		{ CheevosHash,      "cheevosHash", MD_STRING,              "",                 true,       _("Cheevos Hash"),          _("Cheevos checksum"),	    false },
+		{ CheevosId,        "cheevosId",   MD_INT,                 "",				   true,       _("Cheevos Game ID"),       _("Cheevos Game ID"),		false },
+
+		{ ScraperId,        "id",		   MD_INT,                 "",				   true,       _("Screenscraper Game ID"), _("Screenscraper Game ID"),	false, true }
 	};
 	
 	mMetaDataDecls = std::vector<MetaDataDecl>(gameDecls, gameDecls + sizeof(gameDecls) / sizeof(gameDecls[0]));
@@ -137,7 +144,10 @@ MetaDataList MetaDataList::createFromXML(MetaDataListType type, pugi::xml_node& 
 	MetaDataList mdl(type);
 	mdl.mRelativeTo = system;
 	std::string value;
-	
+	std::string relativeTo = mdl.mRelativeTo->getStartPath();
+
+	bool preloadMedias = Settings::PreloadMedias();
+
 	for (pugi::xml_node xelement : node.children())
 	{
 		std::string name = xelement.name();
@@ -174,7 +184,11 @@ MetaDataList MetaDataList::createFromXML(MetaDataListType type, pugi::xml_node& 
 
 		if (mdd.type == MD_BOOL)
 			value = Utils::String::toLower(value);
-
+		
+		if (preloadMedias && mdd.type == MD_PATH && (mdd.id == MetaDataId::Image || mdd.id == MetaDataId::Thumbnail || mdd.id == MetaDataId::Marquee || mdd.id == MetaDataId::Video) &&
+			!Utils::FileSystem::exists(Utils::FileSystem::resolveRelativePath(value, relativeTo, true)))
+			continue;
+		
 		// Players -> remove "1-"
 		if (type == GAME_METADATA && mdd.id == MetaDataId::Players && Utils::String::startsWith(value, "1-"))
 			value = Utils::String::replace(value, "1-", "");
@@ -233,7 +247,7 @@ void MetaDataList::migrate(FileData* file, pugi::xml_node& node)
 	}
 }
 
-void MetaDataList::appendToXML(pugi::xml_node& parent, bool ignoreDefaults, const std::string& relativeTo) const
+void MetaDataList::appendToXML(pugi::xml_node& parent, bool ignoreDefaults, const std::string& relativeTo, bool fullPaths) const
 {
 	const std::vector<MetaDataDecl>& mdd = getMDD();
 
@@ -260,9 +274,13 @@ void MetaDataList::appendToXML(pugi::xml_node& parent, bool ignoreDefaults, cons
 			// try and make paths relative if we can
 			std::string value = mapIter->second;
 			if (mddIter->type == MD_PATH)
-				value = Utils::FileSystem::createRelativePath(value, relativeTo, true);
-
-			
+			{
+				if (fullPaths && mRelativeTo != nullptr)
+					value = Utils::FileSystem::resolveRelativePath(value, mRelativeTo->getStartPath(), true);
+				else
+					value = Utils::FileSystem::createRelativePath(value, relativeTo, true);
+			}
+						
 			if (mddIter->isAttribute)
 				parent.append_attribute(mddIter->key.c_str()).set_value(value.c_str());
 			else
@@ -293,7 +311,7 @@ void MetaDataList::set(MetaDataId id, const std::string& value)
 	}
 
 	// Players -> remove "1-"
-	if (mType == GAME_METADATA && id == 12 && Utils::String::startsWith(value, "1-")) // "players"
+	if (mType == GAME_METADATA && id == MetaDataId::Players && Utils::String::startsWith(value, "1-")) // "players"
 	{
 		mMap[id] = Utils::String::replace(value, "1-", "");
 		return;

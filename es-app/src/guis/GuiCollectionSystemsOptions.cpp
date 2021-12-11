@@ -34,7 +34,7 @@ void GuiCollectionSystemsOptions::initializeMenu()
 		std::string man;
 		for (auto system : SystemData::sSystemVector)
 		{
-			if (system->isCollection() || system->isGroupChildSystem())
+			if (system->isCollection()/* || system->isGroupChildSystem()*/)
 				continue;
 
 			if (man != system->getSystemMetadata().manufacturer)
@@ -49,7 +49,7 @@ void GuiCollectionSystemsOptions::initializeMenu()
 	else
 	{
 		for (auto system : SystemData::sSystemVector)
-			if (!system->isCollection() && !system->isGroupChildSystem())
+			if (!system->isCollection()/* && !system->isGroupChildSystem()*/)
 				displayedSystems->add(system->getFullName(), system, std::find(hiddenSystems.cbegin(), hiddenSystems.cend(), system->getName()) == hiddenSystems.cend());
 	}
 
@@ -62,7 +62,7 @@ void GuiCollectionSystemsOptions::initializeMenu()
 
 		for (auto system : SystemData::sSystemVector)
 		{
-			if (system->isCollection() || system->isGroupChildSystem())
+			if (system->isCollection()/* || system->isGroupChildSystem()*/)
 				continue;
 
 			if (std::find(sys.cbegin(), sys.cend(), system) == sys.cend())
@@ -84,34 +84,71 @@ void GuiCollectionSystemsOptions::initializeMenu()
 	// get collections
 	addSystemsToMenu();
 
-	auto groupNames = SystemData::getAllGroupNames();
+	// GROUPED SYSTEMS
+	std::vector<std::string> groupNames;
+	for (auto systemName : SystemData::getAllGroupNames())
+		groupNames.push_back(systemName);
+
 	if (groupNames.size() > 0)
 	{
+		std::sort(groupNames.begin(), groupNames.end());
+
 		auto ungroupedSystems = std::make_shared<OptionListComponent<std::string>>(mWindow, _("GROUPED SYSTEMS"), true);
 		for (auto groupName : groupNames)
-		{
+		{			
+			SystemData* pSystem = SystemData::getSystem(groupName);
+			if (pSystem != nullptr)
+				ungroupedSystems->addGroup(Utils::String::toUpper(pSystem->getFullName()));
+			else
+				ungroupedSystems->addGroup(Utils::String::toUpper(groupName));
+
 			std::string description;
-			for (auto zz : SystemData::getGroupChildSystemNames(groupName))
+
+			std::vector<std::string> systemNames;
+			for (auto systemName : SystemData::getGroupChildSystemNames(groupName))
+				systemNames.push_back(systemName);
+				
+			std::sort(systemNames.begin(), systemNames.end());
+
+			for (auto systemName : systemNames)
 			{
-				if (!description.empty())
-					description += ", ";
+				if (systemName == groupName)
+					continue;
 
-				description += zz;
+				bool isChecked = !Settings::getInstance()->getBool(groupName + ".ungroup") && !Settings::getInstance()->getBool(systemName + ".ungroup");
+				
+				SystemData* pSystem = SystemData::getSystem(systemName);
+				if (pSystem != nullptr)
+					ungroupedSystems->add(pSystem->getFullName(), systemName, isChecked);
+				else
+					ungroupedSystems->add(systemName, systemName, isChecked);
 			}
-
-			ungroupedSystems->addEx(groupName, description, groupName, !Settings::getInstance()->getBool(groupName + ".ungroup"));
 		}
 
 		addWithLabel(_("GROUPED SYSTEMS"), ungroupedSystems);
-
+		
 		addSaveFunc([this, ungroupedSystems, groupNames]
 		{
 			std::vector<std::string> checkedItems = ungroupedSystems->getSelectedObjects();
+
 			for (auto groupName : groupNames)
 			{
-				bool isGroupActive = std::find(checkedItems.cbegin(), checkedItems.cend(), groupName) != checkedItems.cend();
-				if (Settings::getInstance()->setBool(groupName + ".ungroup", !isGroupActive))
+				if (std::find(checkedItems.cbegin(), checkedItems.cend(), groupName) == checkedItems.cend() && Settings::getInstance()->getBool(groupName + ".ungroup"))
+					Settings::getInstance()->setBool(groupName + ".ungroup", false);
+
+				for (auto systemName : SystemData::getGroupChildSystemNames(groupName))
+				{
+					if (systemName == groupName)
+						continue;
+
+					bool unGrouped = std::find(checkedItems.cbegin(), checkedItems.cend(), systemName) == checkedItems.cend();
+
+					if (Settings::getInstance()->getBool(systemName + ".ungroup") == unGrouped)
+						continue;
+
+					Settings::getInstance()->setBool(systemName + ".ungroup", unGrouped);
 					setVariable("reloadSystems", true);
+				}
 			}
 		});
 	}
@@ -282,11 +319,11 @@ void GuiCollectionSystemsOptions::initializeMenu()
 	});
 
 	std::shared_ptr<SwitchComponent> alsoHideGames = std::make_shared<SwitchComponent>(mWindow);
-	alsoHideGames->setState(Settings::getInstance()->getBool("HiddenSystemsShowGames"));
+	alsoHideGames->setState(Settings::HiddenSystemsShowGames());
 	addWithLabel(_("SHOW GAMES OF HIDDEN SYSTEMS IN COLLECTIONS"), alsoHideGames);
 	addSaveFunc([this, alsoHideGames]
 	{
-		if (Settings::getInstance()->setBool("HiddenSystemsShowGames", alsoHideGames->getState()))
+		if (Settings::setHiddenSystemsShowGames(alsoHideGames->getState()))
 		{
 			FileData::resetSettings();
 			setVariable("reloadSystems", true);
@@ -295,7 +332,7 @@ void GuiCollectionSystemsOptions::initializeMenu()
 	
 #if defined(WIN32) && !defined(_DEBUG)		
 	if (!ApiSystem::getInstance()->isScriptingSupported(ApiSystem::GAMESETTINGS))
-		addEntry(_("UPDATE GAMES LISTS"), false, [this] { GuiMenu::updateGameLists(mWindow); }); // Game List Update
+		addEntry(_("UPDATE GAMELISTS"), false, [this] { GuiMenu::updateGameLists(mWindow); }); // Game List Update
 #endif		
 	
 	addSaveFunc([this]

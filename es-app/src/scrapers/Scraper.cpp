@@ -13,6 +13,7 @@
 #include "utils/StringUtil.h"
 #include <thread>
 #include <SDL_timer.h>
+#include "HfsDBScraper.h"
 
 #define OVERQUOTA_RETRY_DELAY 15000
 #define OVERQUOTA_RETRY_COUNT 5
@@ -25,6 +26,10 @@ std::vector<std::pair<std::string, Scraper*>> Scraper::scrapers
 
 #ifdef GAMESDB_APIKEY
 	{ "TheGamesDB", new TheGamesDBScraper() },
+#endif
+
+#ifdef HFS_DEV_LOGIN
+	{ "HfsDB", new HfsDBScraper() },
 #endif
 
 	{ "ArcadeDB", new ArcadeDBScraper() }
@@ -50,7 +55,58 @@ bool Scraper::isValidConfiguredScraper()
 
 bool Scraper::hasMissingMedia(FileData* file)
 {
-	return !Utils::FileSystem::exists(file->getMetadata(MetaDataId::Image));
+	if (isMediaSupported(ScraperMediaSource::Screenshot) || isMediaSupported(ScraperMediaSource::Box2d) || isMediaSupported(ScraperMediaSource::Box3d) || isMediaSupported(ScraperMediaSource::Mix) || isMediaSupported(ScraperMediaSource::TitleShot) || isMediaSupported(ScraperMediaSource::FanArt))
+		if (!Settings::getInstance()->getString("ScrapperImageSrc").empty() && (file->getMetadata(MetaDataId::Image).empty() || !Utils::FileSystem::exists(file->getMetadata(MetaDataId::Image))))
+			return true;
+
+	if (isMediaSupported(ScraperMediaSource::Box2d) || isMediaSupported(ScraperMediaSource::Box3d))
+		if (!Settings::getInstance()->getString("ScrapperThumbSrc").empty() && (file->getMetadata(MetaDataId::Thumbnail).empty() || !Utils::FileSystem::exists(file->getMetadata(MetaDataId::Thumbnail))))
+			return true;
+
+	if (isMediaSupported(ScraperMediaSource::Wheel) || isMediaSupported(ScraperMediaSource::Marquee))
+		if (!Settings::getInstance()->getString("ScrapperLogoSrc").empty() && (file->getMetadata(MetaDataId::Marquee).empty() || !Utils::FileSystem::exists(file->getMetadata(MetaDataId::Marquee))))
+			return true;
+
+	if (isMediaSupported(ScraperMediaSource::Manual))
+		if (Settings::getInstance()->getBool("ScrapeManual") && (file->getMetadata(MetaDataId::Manual).empty() || !Utils::FileSystem::exists(file->getMetadata(MetaDataId::Manual))))
+			return true;
+
+	if (isMediaSupported(ScraperMediaSource::Map))
+		if (Settings::getInstance()->getBool("ScrapeMap") && (file->getMetadata(MetaDataId::Map).empty() || !Utils::FileSystem::exists(file->getMetadata(MetaDataId::Map))))
+			return true;
+
+	if (isMediaSupported(ScraperMediaSource::FanArt))
+		if (Settings::getInstance()->getBool("ScrapeFanart") && (file->getMetadata(MetaDataId::FanArt).empty() || !Utils::FileSystem::exists(file->getMetadata(MetaDataId::FanArt))))
+			return true;
+
+	if (isMediaSupported(ScraperMediaSource::Video))
+		if (Settings::getInstance()->getBool("ScrapeVideos") && (file->getMetadata(MetaDataId::Video).empty() || !Utils::FileSystem::exists(file->getMetadata(MetaDataId::Video))))
+			return true;
+
+	if (isMediaSupported(ScraperMediaSource::BoxBack))
+		if (Settings::getInstance()->getBool("ScrapeBoxBack") && (file->getMetadata(MetaDataId::BoxBack).empty() || !Utils::FileSystem::exists(file->getMetadata(MetaDataId::BoxBack))))
+			return true;
+
+	if (isMediaSupported(ScraperMediaSource::TitleShot))
+		if (Settings::getInstance()->getBool("ScrapeTitleShot") && (file->getMetadata(MetaDataId::TitleShot).empty() || !Utils::FileSystem::exists(file->getMetadata(MetaDataId::TitleShot))))
+			return true;
+
+	if (isMediaSupported(ScraperMediaSource::Cartridge))
+		if (Settings::getInstance()->getBool("ScrapeCartridge") && (file->getMetadata(MetaDataId::Cartridge).empty() || !Utils::FileSystem::exists(file->getMetadata(MetaDataId::Cartridge))))
+			return true;
+
+	if (isMediaSupported(ScraperMediaSource::Bezel_16_9))
+		if (Settings::getInstance()->getBool("ScrapeBezel") && (file->getMetadata(MetaDataId::Bezel).empty() || !Utils::FileSystem::exists(file->getMetadata(MetaDataId::Bezel))))
+			return true;
+	
+
+	return false;
+}
+
+bool Scraper::isMediaSupported(const Scraper::ScraperMediaSource& md)
+{
+	auto mdds = getSupportedMedias();
+	return mdds.find(md) != mdds.cend();
 }
 
 std::unique_ptr<ScraperSearchHandle> Scraper::search(const ScraperSearchParams& params)
@@ -122,11 +178,15 @@ void ScraperSearchHandle::update()
 }
 
 // ScraperHttpRequest
-ScraperHttpRequest::ScraperHttpRequest(std::vector<ScraperSearchResult>& resultsWrite, const std::string& url) 
+ScraperHttpRequest::ScraperHttpRequest(std::vector<ScraperSearchResult>& resultsWrite, const std::string& url, HttpReqOptions* options)
 	: ScraperRequest(resultsWrite)
 {
 	setStatus(ASYNC_IN_PROGRESS);
-	mRequest = new HttpReq(url);
+
+	if (options != nullptr)
+		mOptions = *options;
+
+	mRequest = new HttpReq(url, &mOptions);
 	mRetryCount = 0;
 	mOverQuotaPendingTime = 0;
 }
@@ -149,7 +209,7 @@ void ScraperHttpRequest::update()
 
 			std::string url = mRequest->getUrl();
 			delete mRequest;
-			mRequest = new HttpReq(url);
+			mRequest = new HttpReq(url, &mOptions);
 		}
 
 		return;
@@ -239,6 +299,7 @@ MDResolveHandle::MDResolveHandle(const ScraperSearchResult& result, const Scrape
 		case MetaDataId::Magazine: suffix = "magazine"; resize = false;  break;
 		case MetaDataId::Map: suffix = "map"; resize = false; break;
 		case MetaDataId::Cartridge: suffix = "cartridge"; break;
+		case MetaDataId::Bezel: suffix = "bezel"; resize = false; break;
 		}
 
 		auto ext = url.second.format;
@@ -464,7 +525,7 @@ void ImageDownloadHandle::update()
 		}
 
 		// It's an image ?
-		if (mSavePath.find("-fanart") == std::string::npos && mSavePath.find("-map") == std::string::npos && (ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".bmp" || ext == ".gif"))
+		if (mSavePath.find("-fanart") == std::string::npos && mSavePath.find("-bezel") == std::string::npos && mSavePath.find("-map") == std::string::npos && (ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".bmp" || ext == ".gif"))
 		{
 			try { resizeImage(mSavePath, mMaxWidth, mMaxHeight); }
 			catch(...) { }
@@ -567,6 +628,7 @@ std::string Scraper::getSaveAsPath(FileData* game, const MetaDataId metadataId, 
 	case MetaDataId::Magazine: suffix = "magazine"; folder = "magazines"; break;
 	case MetaDataId::Map: suffix = "map"; break;
 	case MetaDataId::Cartridge: suffix = "cartridge"; break;
+	case MetaDataId::Bezel: suffix = "bezel"; break;
 	}
 
 	auto system = game->getSourceFileData()->getSystem();

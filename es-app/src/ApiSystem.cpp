@@ -606,6 +606,16 @@ bool ApiSystem::setStorage(std::string selected)
 	return executeScript("batocera-config storage " + selected);
 }
 
+bool ApiSystem::setButtonColorGameForce(std::string selected)
+{
+	return executeScript("batocera-gameforce buttonColorLed " + selected);
+}
+
+bool ApiSystem::setPowerLedGameForce(std::string selected)
+{
+	return executeScript("batocera-gameforce powerLed " + selected);
+}
+
 bool ApiSystem::forgetBluetoothControllers() 
 {
 	return executeScript("batocera-config forgetBT");
@@ -632,6 +642,11 @@ std::string ApiSystem::getRootPassword()
 	return oss.str().c_str();
 }
 
+std::vector<std::string> ApiSystem::getAvailableVideoOutputDevices() 
+{
+	return executeEnumerationScript("batocera-config lsoutputs");
+}
+
 std::vector<std::string> ApiSystem::getAvailableAudioOutputDevices() 
 {
 #if WIN32
@@ -641,11 +656,6 @@ std::vector<std::string> ApiSystem::getAvailableAudioOutputDevices()
 #endif
 
 	return executeEnumerationScript("batocera-audio list");
-}
-
-std::vector<std::string> ApiSystem::getAvailableVideoOutputDevices() 
-{
-	return executeEnumerationScript("batocera-config lsoutputs");
 }
 
 std::string ApiSystem::getCurrentAudioOutputDevice() 
@@ -680,14 +690,60 @@ bool ApiSystem::setAudioOutputDevice(std::string selected)
 
 	std::ostringstream oss;
 
-	AudioManager::getInstance()->deinit();
-	VolumeControl::getInstance()->deinit();
-
 	oss << "batocera-audio set" << " '" << selected << "'";
 	int exitcode = system(oss.str().c_str());
 
-	VolumeControl::getInstance()->init();
-	AudioManager::getInstance()->init();
+	Sound::get("/usr/share/emulationstation/resources/checksound.ogg")->play();
+
+	return exitcode == 0;
+}
+
+std::vector<std::string> ApiSystem::getAvailableAudioOutputProfiles()
+{
+#if WIN32
+	std::vector<std::string> res;
+	res.push_back("auto");
+	return res;
+#endif
+
+	return executeEnumerationScript("batocera-audio list-profiles");
+}
+
+std::string ApiSystem::getCurrentAudioOutputProfile() 
+{
+#if WIN32
+	return "auto";
+#endif
+
+	LOG(LogDebug) << "ApiSystem::getCurrentAudioOutputProfile";
+
+	std::ostringstream oss;
+	oss << "batocera-audio get-profile";
+	FILE *pipe = popen(oss.str().c_str(), "r");
+	char line[1024];
+
+	if (pipe == NULL)
+		return "";	
+
+	if (fgets(line, 1024, pipe)) 
+	{
+		strtok(line, "\n");
+		pclose(pipe);
+		return std::string(line);
+	}
+
+	return "";
+}
+
+bool ApiSystem::setAudioOutputProfile(std::string selected) 
+{
+	LOG(LogDebug) << "ApiSystem::setAudioOutputProfile";
+
+	std::ostringstream oss;
+
+	oss << "batocera-audio set-profile" << " '" << selected << "'";
+	int exitcode = system(oss.str().c_str());
+
 	Sound::get("/usr/share/emulationstation/resources/checksound.ogg")->play();
 
 	return exitcode == 0;
@@ -1185,7 +1241,10 @@ bool ApiSystem::isScriptingSupported(ScriptId script)
 		break;
 	case ApiSystem::EVMAPY:
 		executables.push_back("evmapy");
-		break;		
+		break;
+	case ApiSystem::BATOCERAPREGAMELISTSHOOK:
+		executables.push_back("batocera-preupdate-gamelists-hook");
+		break;
 	}
 
 	if (executables.size() == 0)
@@ -1460,6 +1519,11 @@ void ApiSystem::refreshBatoceraStorePackageList()
 	executeScript("batocera-store clean-all");
 }
 
+void ApiSystem::callBatoceraPreGameListsHook()
+{
+	executeScript("batocera-preupdate-gamelists-hook");
+}
+
 void ApiSystem::updateBatoceraStorePackageList()
 {
 	executeScript("batocera-store update");
@@ -1640,4 +1704,11 @@ std::string ApiSystem::getHostsName()
 		return hostName;
 
 	return "127.0.0.1";
+}
+
+bool ApiSystem::emuKill()
+{
+	LOG(LogDebug) << "ApiSystem::emuKill";
+
+	return executeScript("batocera-es-swissknife --emukill");
 }
